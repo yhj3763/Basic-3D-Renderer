@@ -1,26 +1,40 @@
 #include <spdlog/spdlog.h>
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
+
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
+
 #include <imgui.h>
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_opengl3.h>
-
-#define STB_IMAGE_IMPLEMENTATION
-#include "stb/stb_image.h""
+#include <memory>
 
 #include "shader.h"
+#include "texture.h"
+#include "camera.h"
 
 #include <iostream>
 
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void processInput(GLFWwindow *window);
-void OnKeyEvent(GLFWwindow* window,int key, int scancode, int action, int mods);
-void OnScroll(GLFWwindow* window, double xoffset, double yoffset);
-void OnCharEvent(GLFWwindow* window, unsigned int ch);
+void mouse_callback(GLFWwindow* window, double xpos, double ypos);
+void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
+void OnMouseButton(GLFWwindow* window, int button, int action, int modifier);
+
+
+const unsigned int WIDTH = 800;
+const unsigned int HEIGHT = 600;
+
+Camera camera(glm::vec3(0.0f, 0.0f, 3.0f));
+float lastX = 800/2.0f;
+float lastY = 600/2.0f;
+bool firstMouse = true;
+
+float deltaTime = 0.0f;
+float lastFrame = 0.0f;
 
 
 int main()
@@ -30,7 +44,7 @@ int main()
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-    auto window = glfwCreateWindow(800, 600, WINDOW_NAME, nullptr, nullptr);
+    auto window = glfwCreateWindow(WIDTH, HEIGHT, WINDOW_NAME, nullptr, nullptr);
     if (window == NULL){
         SPDLOG_ERROR("Faild to create GLFW window");
         glfwTerminate();
@@ -47,7 +61,11 @@ int main()
     }
 
     glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
+    glfwSetCursorPosCallback(window, mouse_callback);
+    glfwSetScrollCallback(window, scroll_callback);
+    glfwSetMouseButtonCallback(window, OnMouseButton);  
  
+    //glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
     glEnable(GL_DEPTH_TEST);
 
@@ -128,61 +146,19 @@ int main()
     glEnableVertexAttribArray(1);
 
 
-    unsigned int texture1;
-    glGenTextures(1, &texture1);
-    glBindTexture(GL_TEXTURE_2D, texture1);
+    std::unique_ptr<Texture> t1(new Texture());
+    std::unique_ptr<Texture> t2(new Texture());
 
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);	// set texture wrapping to GL_REPEAT (default wrapping method)
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-    // set texture filtering parameters
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-
-
-    int width, height, nrChannels;
-    stbi_set_flip_vertically_on_load(true);
-    unsigned char* data = stbi_load("./image/container.jpg", &width, &height, &nrChannels, 0);
-
-    if(data){
-        
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
-        glGenerateMipmap(GL_TEXTURE_2D);
-    }
-
-    stbi_image_free(data);
-
-    unsigned int texture2;
-    glGenTextures(1, &texture2);
-    glBindTexture(GL_TEXTURE_2D, texture2);
-
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);	// set texture wrapping to GL_REPEAT (default wrapping method)
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-    // set texture filtering parameters
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-
-
-    data = stbi_load("./image/awesomeface.png", &width, &height, &nrChannels, 0);
-
-    if(data){
-        
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
-        glGenerateMipmap(GL_TEXTURE_2D);
-    }
-    stbi_image_free(data);
+    t1->Create();
+    t1->load("./image/container.jpg", 1);
+    t2->Create();
+    t2->load("./image/awesomeface.png", 0);
 
     ourShader.use();
-    glUniform1i(glGetUniformLocation(ourShader.ID, "texture1"),0);
-    glUniform1i(glGetUniformLocation(ourShader.ID, "texture2"),1);
- 
+    ourShader.setInt("texture1", 0);
+    ourShader.setInt("texture2", 1); 
     
     auto imguiContext = ImGui::CreateContext();
-    // ImGuiIO& io = ImGui::GetIO(); (void)io;    
-    // ImGui::StyleColorsDark();
-    // ImGui_ImplGlfw_InitForOpenGL(window, true);
-    // ImGui_ImplOpenGL3_Init();
     ImGui::SetCurrentContext(imguiContext);
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init();
@@ -190,16 +166,10 @@ int main()
     ImGui_ImplOpenGL3_CreateDeviceObjects();
 
 
-    
-    // glm::mat4 trans = glm::mat4(1.0f);
-    // glm::vec3 vtrans = glm::vec3(0.5f,0.5f, 0.5f);
-    // trans = glm::scale(trans, vtrans);
+    glm::mat4 projection;
+    projection = glm::perspective(glm::radians(camera.Zoom), 800.0f/600.0f, 0.1f, 100.0f);
 
- 
-    float angle = 50.0f;
-    glm::vec3 vmodel =glm::vec3(0.5f,1.0f,0.0f);
-    glm::vec3 Vview = glm::vec3(0.0f, 1.0f, -3.0f);
-    glm::vec3 vtrans = glm::vec3(0.5f,0.5f, 5.0f);
+    ourShader.setMat4("projection", projection);
 
     while(!glfwWindowShouldClose(window)){
         ImGui_ImplOpenGL3_NewFrame();
@@ -207,31 +177,42 @@ int main()
         ImGui::NewFrame();
 
         if(ImGui::Begin("my first ImGui window")){
-            ImGui::SliderFloat3("Vtrans", glm::value_ptr(vtrans),-10.0f, 10.0f );
-            ImGui::SliderFloat3("Vview", glm::value_ptr(Vview),-30.0f, 30.0f );
-             
+             ImGui::DragFloat3("Camera Position", glm::value_ptr(camera.Pos), 0.01f);
+             ImGui::DragFloat("Camera Yaw", &camera.Yaw, 0.5f);
+             ImGui::DragFloat("Camera Pitch", &camera.Pitch, 0.5f, -89.0f, 89.0f);
+            if (ImGui::Button("Reset Camera")) {
+                camera.Yaw =-90.0f;
+                camera.Pitch = 0.0f;
+                camera.Pos = glm::vec3(0.0f, 0.0f, 3.0f);
+            }
+
         }
         ImGui::End();
+        camera.updateCameraVector();
+
+        float currentFrame = static_cast<float>(glfwGetTime());
+        deltaTime = currentFrame - lastFrame;
+        lastFrame = currentFrame;
        
         processInput(window);
 
         glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
 
-     
-
-
-    
 
         glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, texture1);
+        glBindTexture(GL_TEXTURE_2D, t1->get());
 
         glActiveTexture(GL_TEXTURE1);
-        glBindTexture(GL_TEXTURE_2D, texture2);
+        glBindTexture(GL_TEXTURE_2D, t2->get());
 
         ourShader.use();
 
-   
+       
+        glm::mat4 view;
+        view = camera.GetViewMatrix();
+        ourShader.setMat4("view", view);
+;   
         glBindVertexArray(VAO);
         for (unsigned int i = 0; i < 10; i++)
         {
@@ -239,10 +220,7 @@ int main()
             glm::mat4 model = glm::mat4(1.0f);
             model = glm::translate(model, cubePositions[i]);
             float angle = 20.0f * i;
-            if(i % 3 == 0){
-                angle = glfwGetTime() * 25.0f;
-            }   
-   
+
             model = glm::rotate(model,glm::radians(angle), glm::vec3(1.0f, 0.3f, 0.5f));
           
   
@@ -251,32 +229,6 @@ int main()
             glDrawArrays(GL_TRIANGLES, 0, 36);
         }
        
-
-      
-
-    
-        glm::mat4 trans = glm::mat4(1.0f);
-        trans = glm::scale(trans, vtrans);
-
-            
-        glm::mat4 model = glm::mat4(1.0f);
-        model = glm::rotate(model, (float)glfwGetTime()*(glm::radians(angle)), vmodel);
-
-        glm::mat4 view = glm::mat4(1.0f);
-        view = glm::translate(view, Vview);
-
-            
-        glm::mat4 projection;
-        projection = glm::perspective(glm::radians(45.0f), 800.0f/600.0f, 0.1f, 100.0f);
-
-    
-        ourShader.use();
-    
-        glUniformMatrix4fv(glGetUniformLocation(ourShader.ID, "transform"), 1, GL_FALSE, glm::value_ptr(trans));
-        glUniformMatrix4fv(glGetUniformLocation(ourShader.ID, "model"), 1, GL_FALSE, glm::value_ptr(model));
-        glUniformMatrix4fv(glGetUniformLocation(ourShader.ID, "view"), 1, GL_FALSE,  glm::value_ptr(view));
-
-        ourShader.setMat4("projection", projection);
 
 
         ImGui::Render();
@@ -299,6 +251,20 @@ void processInput(GLFWwindow *window)
 {
     if(glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
         glfwSetWindowShouldClose(window, true);
+
+    if (!camera.cameraControl)
+        return;
+
+    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
+        camera.KeyboardProcess(FORWARD, deltaTime);
+    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+        camera.KeyboardProcess(BACKWARD, deltaTime);
+    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+        camera.KeyboardProcess(LEFT, deltaTime);
+    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+        camera.KeyboardProcess(RIGHT, deltaTime);
+
+
 }
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height){
@@ -306,26 +272,40 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height){
     glViewport(0,0, width, height);
 }
 
-void OnKeyEvent(GLFWwindow* window,
-    int key, int scancode, int action, int mods) {
-    ImGui_ImplGlfw_KeyCallback(window, key, scancode, action, mods);
-    SPDLOG_INFO("key: {}, scancode: {}, action: {}, mods: {}{}{}",
-        key, scancode,
-        action == GLFW_PRESS ? "Pressed" :
-        action == GLFW_RELEASE ? "Released" :
-        action == GLFW_REPEAT ? "Repeat" : "Unknown",
-        mods & GLFW_MOD_CONTROL ? "C" : "-",
-        mods & GLFW_MOD_SHIFT ? "S" : "-",
-        mods & GLFW_MOD_ALT ? "A" : "-");
-    if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
-        glfwSetWindowShouldClose(window, true);
+void  mouse_callback(GLFWwindow* window, double xposin, double yposin){
+ 
+    
+    if (!camera.cameraControl)
+            return;
+
+    float xpos = static_cast<float>(xposin);
+    float ypos = static_cast<float>(yposin);
+
+    if(firstMouse){
+        lastX = xpos;
+        lastY = ypos;
+        firstMouse = false;
     }
+
+    float xoffset = xpos - lastX;
+    float yoffset = lastY - ypos; 
+
+    lastX = xpos;
+    lastY = ypos;
+
+    camera.MouseMovement(xoffset, yoffset);
+
 }
 
-void OnScroll(GLFWwindow* window, double xoffset, double yoffset) {
-    ImGui_ImplGlfw_ScrollCallback(window, xoffset, yoffset);
+void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
+{
+    camera.MouseScroll(static_cast<float>(yoffset));
 }
 
-void OnCharEvent(GLFWwindow* window, unsigned int ch) {
-    ImGui_ImplGlfw_CharCallback(window, ch);
+void OnMouseButton(GLFWwindow* window, int button, int action, int modifier) {
+    auto context = glfwGetWindowUserPointer(window);
+    double x, y;
+    glfwGetCursorPos(window, &x, &y);
+    camera.MouseButton(button, action, x, y);
 }
+
