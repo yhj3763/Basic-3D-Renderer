@@ -23,6 +23,7 @@ void processInput(GLFWwindow *window);
 void mouse_callback(GLFWwindow* window, double xpos, double ypos);
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 void OnMouseButton(GLFWwindow* window, int button, int action, int modifier);
+void ObjectMouseButton(GLFWwindow* window, int button, int action, double x, double y);
 
 
 const unsigned int WIDTH = 800;
@@ -36,6 +37,10 @@ bool firstMouse = true;
 float deltaTime = 0.0f;
 float lastFrame = 0.0f;
 
+glm::vec3 lightPos(1.2f, 1.0f, 2.0f);
+glm::vec3 objectPos(0.0f, 0.0f, 0.0f);
+
+//glm::vec2 objMoveVec = glm::vec2(0.0f, 0.0f);
 
 int main()
 {
@@ -69,52 +74,53 @@ int main()
 
     glEnable(GL_DEPTH_TEST);
 
-    Shader ourShader("./shader/simple.vs", "./shader/simple.fs");
+    //Shader ourShader("./shader/simple.vs", "./shader/simple.fs");
+    Shader lightShader("./shader/light.vs", "./shader/light.fs");
+    Shader lightcubeShader("./shader/lightcube.vs", "./shader/lightcube.fs");
 
     float vertices[] = {
-        -0.5f, -0.5f, -0.5f,  0.0f, 0.0f,
-         0.5f, -0.5f, -0.5f,  1.0f, 0.0f,
-         0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
-         0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
-        -0.5f,  0.5f, -0.5f,  0.0f, 1.0f,
-        -0.5f, -0.5f, -0.5f,  0.0f, 0.0f,
+        -0.5f, -0.5f, -0.5f,  0.0f,  0.0f, -1.0f,
+         0.5f, -0.5f, -0.5f,  0.0f,  0.0f, -1.0f,
+         0.5f,  0.5f, -0.5f,  0.0f,  0.0f, -1.0f,
+         0.5f,  0.5f, -0.5f,  0.0f,  0.0f, -1.0f,
+        -0.5f,  0.5f, -0.5f,  0.0f,  0.0f, -1.0f,
+        -0.5f, -0.5f, -0.5f,  0.0f,  0.0f, -1.0f,
 
-        -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
-         0.5f, -0.5f,  0.5f,  1.0f, 0.0f,
-         0.5f,  0.5f,  0.5f,  1.0f, 1.0f,
-         0.5f,  0.5f,  0.5f,  1.0f, 1.0f,
-        -0.5f,  0.5f,  0.5f,  0.0f, 1.0f,
-        -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
+        -0.5f, -0.5f,  0.5f,  0.0f,  0.0f,  1.0f,
+         0.5f, -0.5f,  0.5f,  0.0f,  0.0f,  1.0f,
+         0.5f,  0.5f,  0.5f,  0.0f,  0.0f,  1.0f,
+         0.5f,  0.5f,  0.5f,  0.0f,  0.0f,  1.0f,
+        -0.5f,  0.5f,  0.5f,  0.0f,  0.0f,  1.0f,
+        -0.5f, -0.5f,  0.5f,  0.0f,  0.0f,  1.0f,
 
-        -0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
-        -0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
-        -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
-        -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
-        -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
-        -0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
+        -0.5f,  0.5f,  0.5f, -1.0f,  0.0f,  0.0f,
+        -0.5f,  0.5f, -0.5f, -1.0f,  0.0f,  0.0f,
+        -0.5f, -0.5f, -0.5f, -1.0f,  0.0f,  0.0f,
+        -0.5f, -0.5f, -0.5f, -1.0f,  0.0f,  0.0f,
+        -0.5f, -0.5f,  0.5f, -1.0f,  0.0f,  0.0f,
+        -0.5f,  0.5f,  0.5f, -1.0f,  0.0f,  0.0f,
 
-         0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
-         0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
-         0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
-         0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
-         0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
-         0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
+         0.5f,  0.5f,  0.5f,  1.0f,  0.0f,  0.0f,
+         0.5f,  0.5f, -0.5f,  1.0f,  0.0f,  0.0f,
+         0.5f, -0.5f, -0.5f,  1.0f,  0.0f,  0.0f,
+         0.5f, -0.5f, -0.5f,  1.0f,  0.0f,  0.0f,
+         0.5f, -0.5f,  0.5f,  1.0f,  0.0f,  0.0f,
+         0.5f,  0.5f,  0.5f,  1.0f,  0.0f,  0.0f,
 
-        -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
-         0.5f, -0.5f, -0.5f,  1.0f, 1.0f,
-         0.5f, -0.5f,  0.5f,  1.0f, 0.0f,
-         0.5f, -0.5f,  0.5f,  1.0f, 0.0f,
-        -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
-        -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
+        -0.5f, -0.5f, -0.5f,  0.0f, -1.0f,  0.0f,
+         0.5f, -0.5f, -0.5f,  0.0f, -1.0f,  0.0f,
+         0.5f, -0.5f,  0.5f,  0.0f, -1.0f,  0.0f,
+         0.5f, -0.5f,  0.5f,  0.0f, -1.0f,  0.0f,
+        -0.5f, -0.5f,  0.5f,  0.0f, -1.0f,  0.0f,
+        -0.5f, -0.5f, -0.5f,  0.0f, -1.0f,  0.0f,
 
-        -0.5f,  0.5f, -0.5f,  0.0f, 1.0f,
-         0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
-         0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
-         0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
-        -0.5f,  0.5f,  0.5f,  0.0f, 0.0f,
-        -0.5f,  0.5f, -0.5f,  0.0f, 1.0f
+        -0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f,
+         0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f,
+         0.5f,  0.5f,  0.5f,  0.0f,  1.0f,  0.0f,
+         0.5f,  0.5f,  0.5f,  0.0f,  1.0f,  0.0f,
+        -0.5f,  0.5f,  0.5f,  0.0f,  1.0f,  0.0f,
+        -0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f
     };
-
     glm::vec3 cubePositions[] = {
         glm::vec3( 0.0f, 0.0f, 0.0f),
         glm::vec3( 2.0f, 5.0f, -15.0f),
@@ -140,10 +146,20 @@ int main()
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
     glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3*sizeof(float)));
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3*sizeof(float)));
     glEnableVertexAttribArray(1);
+
+    unsigned int lightVAO;
+
+    glGenVertexArrays(1, &lightVAO);
+    glBindVertexArray(lightVAO);
+
+    glBindBuffer(GL_ARRAY_BUFFER, VBO);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*) 0);
+
+    glEnableVertexAttribArray(0);
 
 
     std::unique_ptr<Texture> t1(new Texture());
@@ -154,10 +170,7 @@ int main()
     t2->Create();
     t2->load("./image/awesomeface.png", 0);
 
-    ourShader.use();
-    ourShader.setInt("texture1", 0);
-    ourShader.setInt("texture2", 1); 
-    
+
     auto imguiContext = ImGui::CreateContext();
     ImGui::SetCurrentContext(imguiContext);
     ImGui_ImplGlfw_InitForOpenGL(window, true);
@@ -165,11 +178,6 @@ int main()
     ImGui_ImplOpenGL3_CreateFontsTexture();
     ImGui_ImplOpenGL3_CreateDeviceObjects();
 
-
-    glm::mat4 projection;
-    projection = glm::perspective(glm::radians(camera.Zoom), 800.0f/600.0f, 0.1f, 100.0f);
-
-    ourShader.setMat4("projection", projection);
 
     while(!glfwWindowShouldClose(window)){
         ImGui_ImplOpenGL3_NewFrame();
@@ -180,10 +188,25 @@ int main()
              ImGui::DragFloat3("Camera Position", glm::value_ptr(camera.Pos), 0.01f);
              ImGui::DragFloat("Camera Yaw", &camera.Yaw, 0.5f);
              ImGui::DragFloat("Camera Pitch", &camera.Pitch, 0.5f, -89.0f, 89.0f);
+             ImGui::DragFloat3("Object Position", glm::value_ptr(objectPos), 0.05f);
             if (ImGui::Button("Reset Camera")) {
                 camera.Yaw =-90.0f;
                 camera.Pitch = 0.0f;
                 camera.Pos = glm::vec3(0.0f, 0.0f, 3.0f);
+            }
+            ImGui::Dummy(ImVec2(0.0f, 20.0f));
+            if(ImGui::BeginTabBar("tabs")){
+
+                if(ImGui::BeginTabItem("Object")){
+                    ImGui::EndTabItem();
+                }
+
+                if(ImGui::BeginTabItem("Light"))
+                {
+                    ImGui::EndTabItem();
+                }
+
+                ImGui::EndTabBar();
             }
 
         }
@@ -196,40 +219,40 @@ int main()
        
         processInput(window);
 
-        glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
+        glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
 
-
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, t1->get());
-
-        glActiveTexture(GL_TEXTURE1);
-        glBindTexture(GL_TEXTURE_2D, t2->get());
-
-        ourShader.use();
+        lightShader.use();
+        lightShader.setVec3("objectColor", glm::vec3(1.0f, 0.5f, 0.31f));
+        lightShader.setVec3("lightColor", glm::vec3(1.0f, 1.0f, 1.0f));
+        lightShader.setVec3("lightPos", lightPos);
+        lightShader.setVec3("viewPos", camera.Pos);
+       
+        glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), 800.0f/600.0f, 0.1f, 100.0f);
+        lightShader.setMat4("projection", projection);
 
        
-        glm::mat4 view;
-        view = camera.GetViewMatrix();
-        ourShader.setMat4("view", view);
-;   
+        glm::mat4 view = camera.GetViewMatrix();
+        lightShader.setMat4("view", view);
+
+        glm::mat4 model = glm::mat4(1.0f);
+        model = glm::translate(model, objectPos);
+        lightShader.setMat4("model", model);
+ 
         glBindVertexArray(VAO);
-        for (unsigned int i = 0; i < 10; i++)
-        {
-            // calculate the model matrix for each object and pass it to shader before drawing
-            glm::mat4 model = glm::mat4(1.0f);
-            model = glm::translate(model, cubePositions[i]);
-            float angle = 20.0f * i;
+        glDrawArrays(GL_TRIANGLES, 0, 36);
 
-            model = glm::rotate(model,glm::radians(angle), glm::vec3(1.0f, 0.3f, 0.5f));
-          
-  
-            ourShader.setMat4("model", model);
+        lightcubeShader.use();
+        lightcubeShader.setMat4("projection", projection);
+        lightcubeShader.setMat4("view", view);
+        model = glm::mat4(1.0f);
+        model = glm::translate(model, lightPos);
+        model = glm::scale(model, glm::vec3(0.2f)); // a smaller cube
+        lightcubeShader.setMat4("model", model);
 
-            glDrawArrays(GL_TRIANGLES, 0, 36);
-        }
-       
-
+        glBindVertexArray(VAO);
+        glDrawArrays(GL_TRIANGLES, 0, 36);
+        
 
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
@@ -307,5 +330,45 @@ void OnMouseButton(GLFWwindow* window, int button, int action, int modifier) {
     double x, y;
     glfwGetCursorPos(window, &x, &y);
     camera.MouseButton(button, action, x, y);
+    
 }
 
+/*
+void ObjectMouseButton(GLFWwindow* window, int button, int action, double x, double y){
+
+    double sx, sy;
+
+    if (button == GLFW_MOUSE_BUTTON_LEFT) {
+        if (action == GLFW_PRESS) {
+            objMove = true;
+        }
+        else if (action == GLFW_RELEASE) {
+            glfwGetCursorPos(window, &sx, &sy);
+
+            if(y- sy > 0){
+                objMoveVec.y -= 1.0f;
+                y = sy;
+            }
+            else{
+
+                objMoveVec.y += 1.0f;
+                y = sy;
+            }
+
+            if(x-sx >0){
+                objMoveVec.x -=1.0f;
+                x = sx;
+            }
+            else{
+
+                objMoveVec.x += 1.0f;
+                x = sx;
+            }
+
+            objMove = false;
+            
+  }
+
+ }
+}
+*/
