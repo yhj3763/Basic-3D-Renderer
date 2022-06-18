@@ -75,7 +75,7 @@ int main()
     glEnable(GL_DEPTH_TEST);
 
     //Shader ourShader("./shader/simple.vs", "./shader/simple.fs");
-    Shader lightShader("./shader/light.vs", "./shader/light.fs");
+    Shader lightShader("./shader/materials.vs", "./shader/materials.fs");
     Shader lightcubeShader("./shader/lightcube.vs", "./shader/lightcube.fs");
 
     float vertices[] = {
@@ -157,7 +157,7 @@ int main()
     glBindVertexArray(lightVAO);
 
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*) 0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*) 0);
 
     glEnableVertexAttribArray(0);
 
@@ -223,10 +223,25 @@ int main()
         glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
 
         lightShader.use();
-        lightShader.setVec3("objectColor", glm::vec3(1.0f, 0.5f, 0.31f));
-        lightShader.setVec3("lightColor", glm::vec3(1.0f, 1.0f, 1.0f));
-        lightShader.setVec3("lightPos", lightPos);
+        lightShader.setVec3("light.position", lightPos);
         lightShader.setVec3("viewPos", camera.Pos);
+
+        glm::vec3 lightColor;
+        lightColor.x = static_cast<float>(sin(glfwGetTime() * 2.0));
+        lightColor.y = static_cast<float>(sin(glfwGetTime() * 0.7));
+        lightColor.z = static_cast<float>(sin(glfwGetTime() * 1.3));
+        glm::vec3 diffuseColor = lightColor   * glm::vec3(0.5f); 
+        glm::vec3 ambientColor = diffuseColor * glm::vec3(0.2f);
+        lightShader.setVec3("light.ambient", ambientColor);
+        lightShader.setVec3("light.diffuse", diffuseColor);
+        lightShader.setVec3("light.specular", glm::vec3(1.0f, 1.0f, 1.0f));
+
+        lightShader.setVec3("material.ambient", glm::vec3(1.0f, 0.5f, 0.31f));
+        lightShader.setVec3("material.diffuse", glm::vec3(1.0f, 0.5f, 0.31f));
+        lightShader.setVec3("material.specular", glm::vec3(0.5f, 0.5f, 0.5f));
+        lightShader.setFloat("material.shininess", 32.0f);
+        
+
        
         glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), 800.0f/600.0f, 0.1f, 100.0f);
         lightShader.setMat4("projection", projection);
