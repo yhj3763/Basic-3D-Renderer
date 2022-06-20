@@ -17,7 +17,6 @@ enum CameraMovement {
 
 const float YAW         =  -90.0f;
 const float PITCH       =  0.0f;
-const float ZOOM        =  45.0f;
 
 
 class Camera{
@@ -37,7 +36,7 @@ class Camera{
         Camera(glm::vec3 position = glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f), bool cameracontrol = false, glm::vec2 premousepos = glm::vec2(0.0f, 0.0f),  float yaw = YAW, float pitch = PITCH);
         glm::mat4 GetViewMatrix();
         void MouseMovement(float xoffset, float yoffset, GLboolean constrainPitch = true);
-        void MouseScroll(double yoffset);
+        void MouseScroll(float yoffset);
         void KeyboardProcess(CameraMovement direction, float deltaTime);
         void MouseButton(int button, int action, double x, double y);
         void updateCameraVector();

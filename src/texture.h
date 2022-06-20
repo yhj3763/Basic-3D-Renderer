@@ -1,27 +1,23 @@
 #ifndef __TEXTURE_H__
 #define __TEXTURE_H__
 
-
-
-#define STB_IMAGE_IMPLEMENTATION
 #include "stb/stb_image.h"
 
 
-
-class Texture{
+class cTexture{
     private:
         unsigned int texture{ 0 };
 
     public:
-        Texture();
+        cTexture();
         void Create();
         void load(char const* path, int type);
         unsigned int get();
 };
 
-Texture::Texture(){}
+cTexture::cTexture(){}
 
-void Texture::Create(){
+void cTexture::Create(){
 
     glGenTextures(1, &texture);
     glBindTexture(GL_TEXTURE_2D, texture);
@@ -35,7 +31,7 @@ void Texture::Create(){
 }
 
 
-void Texture::load(char const* path, int type){
+void cTexture::load(char const* path, int type){
 
     int width, height, nrChannels;
     stbi_set_flip_vertically_on_load(true);
@@ -54,7 +50,7 @@ void Texture::load(char const* path, int type){
 
 }
 
-unsigned int Texture::get(){
+unsigned int cTexture::get(){
     return texture;
 }
 

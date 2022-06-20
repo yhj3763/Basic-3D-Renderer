@@ -1,6 +1,6 @@
 #include "camera.h"
 
-Camera::Camera(glm::vec3 position, glm::vec3 up,bool cameracontrol, glm::vec2 premousepos, float yaw, float pitch): Front(glm::vec3(0.0f, 0.0f, -1.0f)), Zoom(ZOOM)
+Camera::Camera(glm::vec3 position, glm::vec3 up,bool cameracontrol, glm::vec2 premousepos, float yaw, float pitch)
 {
     cameraControl = cameracontrol;
     preMousePos = premousepos;
@@ -8,34 +8,7 @@ Camera::Camera(glm::vec3 position, glm::vec3 up,bool cameracontrol, glm::vec2 pr
     WorldUp = up;
     Yaw = yaw;
     Pitch = pitch;
-    updateCameraVector();
-}
-
-void Camera::MouseMovement(float xoffset, float yoffset, GLboolean constrainPitch ){
-  
-    float sensitivity = 0.1f; 
-    xoffset *= sensitivity;
-    yoffset *= sensitivity;
-
-    
-    Yaw += xoffset;
-    Pitch += yoffset;
-    
-    
-
-    if(constrainPitch){
-        if (Pitch > 89.0f)
-            Pitch = 89.0f;
-        if (Pitch < -89.0f)
-            Pitch = -89.0f;
-        if (Yaw < 0.0f)
-            Yaw += 360.0f;
-        if (Yaw > 360.f)
-            Yaw -= 360.0f;
-    }
-    
-
-    updateCameraVector();
+    Front = glm::vec3(0.0f, -1.0f, 0.0f);
 }
 
 glm::mat4 Camera::GetViewMatrix()
@@ -44,23 +17,16 @@ glm::mat4 Camera::GetViewMatrix()
 }
 
 
-void Camera::MouseScroll(double yoffset)
-{
-    Zoom -= (float)yoffset;
-    if (Zoom < 1.0f)
-        Zoom = 1.0f;
-    if (Zoom > 45.0f)
-        Zoom = 45.0f;
-}
-
-
 void Camera::KeyboardProcess(CameraMovement direction, float deltaTime){
 
     float cameraSpeed = 0.02f;
+    
     if(direction == FORWARD)
         Pos += Front * cameraSpeed;
     if(direction == BACKWARD)
         Pos -= Front * cameraSpeed;
+
+    auto cameraRight = glm::normalize(glm::cross(Up, -Front));
     if(direction == LEFT)
         Pos -= Right * cameraSpeed;
     if(direction == RIGHT)
@@ -77,6 +43,15 @@ void Camera::MouseButton(int button, int action, double x, double y) {
         cameraControl = false;
     }
   }
+}
+
+void Camera::MouseScroll(float yoffset)
+{
+     Zoom -= (float)yoffset;
+     if (Zoom < 1.0f)
+        Zoom = 1.0f;
+    if (Zoom > 45.0f)
+        Zoom = 45.0f; 
 }
 
 void Camera::updateCameraVector(){

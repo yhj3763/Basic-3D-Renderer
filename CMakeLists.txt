@@ -13,7 +13,12 @@ add_executable(${PROJECT_NAME}
     src/shader.h
     src/texture.h
     src/camera.h
-    src/camera.cpp)
+    src/camera.cpp
+    src/model.h
+    src/mesh.h
+    src/ImGuiFileBrowser.h
+    src/ImGuiFileBrowser.cpp
+    )
 
 include(Dependency.cmake)
 
