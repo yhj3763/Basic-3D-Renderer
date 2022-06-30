@@ -28,6 +28,7 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 void OnMouseButton(GLFWwindow* window, int button, int action, int modifier);
 void ObjectMouseButton(GLFWwindow* window, int button, int action, double x, double y);
 void OnCursorcPos(GLFWwindow* window, double x, double y);
+unsigned int loadCubemap(vector<std::string> faces);
 
 imgui_addons::ImGuiFileBrowser file_dialog;
 
@@ -41,7 +42,6 @@ bool firstMouse = true;
 bool my_tool_active = true;
 bool newobj = false;
 std::string filepath;
-int numofobj = -1;
 
 
 float deltaTime = 0.0f;
@@ -86,7 +86,9 @@ int main()
 
     Shader lightcubeShader("./shader/lightcube.vs", "./shader/lightcube.fs");
     Shader lightShader("./shader/lightcaster.vs", "./shader/lightcaster.fs");
-
+    // Shader simpleShader("./shader/simple.vs", "./shader/simple.fs");
+    Shader skyboxShader("./shader/skybox.vs","./shader/skybox.fs");
+ 
         float vertices[] = {
         // positions          // normals           // texture coords
         -0.5f, -0.5f, -0.5f,  0.0f,  0.0f, -1.0f,  0.0f,  0.0f,
@@ -131,12 +133,74 @@ int main()
         -0.5f,  0.5f,  0.5f,  0.0f,  1.0f,  0.0f,  0.0f,  0.0f,
         -0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f,  0.0f,  1.0f
     };
-
     std::vector<glm::vec3> objectPositions = {};
     std::vector<glm::vec3> pointLightPositions = {};
-    std::vector<glm::vec3> pointLightColors = {};
-    std::vector<bool> lights ={};
+    std::vector<glm::vec3> pointLightAmbient = {
+        glm::vec3(0.0f, 0.0f, 0.0f),
+        glm::vec3(0.0f, 0.0f, 0.0f)
+    };
+    std::vector<glm::vec3> pointLightDiffuse = {
+        glm::vec3(0.0f, 0.0f, 0.0f),
+        glm::vec3(0.0f, 0.0f, 0.0f)
+    };
+    std::vector<glm::vec3> pointLightSpecular = {
+        glm::vec3(0.0f, 0.0f, 0.0f),
+        glm::vec3(0.0f, 0.0f, 0.0f)
+    };
+    std::vector<bool> lights ={
+        true,
+        true
+    };
     std::vector<Model> models ={};
+    std::vector<glm::vec3> sizes = {};
+    glm::vec3 direcLight = glm::vec3(0.0f, 0.0f, 0.0f);
+    bool reset = false;
+
+    float skyboxVertices[] = {
+        // positions          
+        -1.0f,  1.0f, -1.0f,
+        -1.0f, -1.0f, -1.0f,
+         1.0f, -1.0f, -1.0f,
+         1.0f, -1.0f, -1.0f,
+         1.0f,  1.0f, -1.0f,
+        -1.0f,  1.0f, -1.0f,
+
+        -1.0f, -1.0f,  1.0f,
+        -1.0f, -1.0f, -1.0f,
+        -1.0f,  1.0f, -1.0f,
+        -1.0f,  1.0f, -1.0f,
+        -1.0f,  1.0f,  1.0f,
+        -1.0f, -1.0f,  1.0f,
+
+         1.0f, -1.0f, -1.0f,
+         1.0f, -1.0f,  1.0f,
+         1.0f,  1.0f,  1.0f,
+         1.0f,  1.0f,  1.0f,
+         1.0f,  1.0f, -1.0f,
+         1.0f, -1.0f, -1.0f,
+
+        -1.0f, -1.0f,  1.0f,
+        -1.0f,  1.0f,  1.0f,
+         1.0f,  1.0f,  1.0f,
+         1.0f,  1.0f,  1.0f,
+         1.0f, -1.0f,  1.0f,
+        -1.0f, -1.0f,  1.0f,
+
+        -1.0f,  1.0f, -1.0f,
+         1.0f,  1.0f, -1.0f,
+         1.0f,  1.0f,  1.0f,
+         1.0f,  1.0f,  1.0f,
+        -1.0f,  1.0f,  1.0f,
+        -1.0f,  1.0f, -1.0f,
+
+        -1.0f, -1.0f, -1.0f,
+        -1.0f, -1.0f,  1.0f,
+         1.0f, -1.0f, -1.0f,
+         1.0f, -1.0f, -1.0f,
+        -1.0f, -1.0f,  1.0f,
+         1.0f, -1.0f,  1.0f
+    };
+
 
     unsigned int lightVAO;
     unsigned int VBO;
@@ -155,16 +219,26 @@ int main()
 
     glEnableVertexAttribArray(0);
 
+    unsigned int skyboxVAO, skyboxVBO;
+    glGenVertexArrays(1, &skyboxVAO);
+    glGenBuffers(1, &skyboxVBO);
+    glBindVertexArray(skyboxVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, skyboxVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(skyboxVertices), &skyboxVertices, GL_STATIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
 
-    std::unique_ptr<cTexture> t1(new cTexture());
-    std::unique_ptr<cTexture> t2(new cTexture());
-
-
-    t1->Create();
-    t1->load("./image/container2.png", 0);
-
-    t2->Create();
-    t2->load("./image/container2_specular.png", 0);
+    stbi_set_flip_vertically_on_load(false);
+    vector<std::string> faces
+    {
+        "./image/blue/right.png",
+        "./image/blue/left.png",
+        "./image/blue/top.png",
+        "./image/blue/bottom.png",
+        "./image/blue/front.png",
+        "./image/blue/back.png"
+    };
+    unsigned int cubemapTexture = loadCubemap(faces);
 
 
     auto imguiContext = ImGui::CreateContext();
@@ -177,6 +251,10 @@ int main()
     lightShader.use();
     lightShader.setInt("material.diffuse", 0);
     lightShader.setInt("material.specular", 1);
+
+    skyboxShader.use();
+    skyboxShader.setInt("skybox", 0);
+
 
 
     while(!glfwWindowShouldClose(window)){
@@ -213,7 +291,8 @@ int main()
                 Model OurModel(filepath);
                 models.push_back(OurModel);
                 objectPositions.push_back(glm::vec3( 0.0f,  0.0f,  0.0f));
-                numofobj++;
+                sizes.push_back(glm::vec3( 5.0f,  5.0f,  5.0f));
+                
             }
             if(file_dialog.showFileDialog("Save File", imgui_addons::ImGuiFileBrowser::DialogMode::SAVE, ImVec2(700, 310), ".png,.jpg,.bmp"))
             {
@@ -240,69 +319,112 @@ int main()
                     char buff[10] = "Object";
                     char buff2[20] = "Object Position##";
                     char buff3[12] = "Delete##";
+                    char buff4[15] = "Object Size##";
                     for(int i = 0 ; i < objectPositions.size();i++){
                         snprintf(buff, 10, "Object%d", i+1);
                         snprintf(buff2, 20,  "Object Position##%d", i);
                         snprintf(buff3, 12,  "Delete##%d", i);
+                        snprintf(buff4, 15,  "Object Size##%d", i);
                         if(ImGui::CollapsingHeader(buff, ImGuiTreeNodeFlags_DefaultOpen)){
                         ImGui::DragFloat3(buff2, glm::value_ptr(objectPositions[i]), 0.05f);
-                        if(ImGui::Button(buff3)){
-                            objectPositions.erase(objectPositions.begin() + i);
-                            numofobj--;
+                        ImGui::DragFloat3(buff4, glm::value_ptr(sizes[i]), 0.05f);
+                            if(ImGui::Button(buff3)){
+                                objectPositions.erase(objectPositions.begin() + i);
+                                sizes.erase(sizes.begin() + i);  
+                                models.erase(models.begin() + i );  
+                            }
                         }
                     }
-                }
-                    if(ImGui::Button("Add")){
-                        objectPositions.push_back(glm::vec3(0.0f, 0.0f, 0.0f));
-                    }
+
                     ImGui::EndTabItem();
                 }
-                if(ImGui::BeginTabItem("Lights")){   
-                    char buff[10] = "Light";
-                    char buff2[20] = "Light Position##";
-                    char buff3[15] = "Light Color##";
-                    char buff4[12] = "Delete##";
-                    char buff5[8] ="On##";
-                    char buff6[10] ="Off##";
-                    for(int i = 0 ; i < pointLightPositions.size();i++){
-                        snprintf(buff, 10, "Light%d", i+1);
-                        snprintf(buff2, 20,  "Light Position##%d", i);
-                        snprintf(buff3, 15,  "Light Color##%d", i);
-                        snprintf(buff4, 12,  "Delete##%d", i);
-                        snprintf(buff5, 8,  "On##%d", i);
-                        snprintf(buff6, 10,  "Off##%d", i);
-                        if(ImGui::CollapsingHeader(buff, ImGuiTreeNodeFlags_DefaultOpen)){
-                            if(lights[i] == true)
-                                ImGui::DragFloat3(buff2, glm::value_ptr(pointLightPositions[i]), 0.05f);
-                                ImGui::DragFloat3(buff3, glm::value_ptr(pointLightColors[i]), 0.1f);
-                            if(ImGui::Button(buff5)){
-                                lights[i] = true;
-                            }
-                            ImGui::SameLine();
-                            if(ImGui::Button(buff6)){
-                                lights[i] = false;
-                            }
-
-                            if(ImGui::Button(buff4)){
-                                pointLightPositions.erase(pointLightPositions.begin() + i);
-                                pointLightColors.erase(pointLightColors.begin() + i);
-                                lights.erase(lights.begin() +  i);
-                            }
-                        } 
-      
-                    }
-                    if(ImGui::Button("ADD")){ 
-                        if(pointLightPositions.size()==10){
-                            return -1;
+                if(ImGui::BeginTabItem("Lights")){  
+                    if(ImGui::BeginTabBar("tabs2")){
+                        if(ImGui::BeginTabItem("Point Light")){
+                                char buff[10] = "Light";
+                                char buff2[20] = "Light Position##";
+                                char buff3[25] = "Ambient Light##";
+                                char buff3_1[25] = "Diffuse Light##";
+                                char buff3_2[25] = "Specular Light##";
+                                char buff4[12] = "Delete##";
+                                char buff5[8] ="On##";
+                                char buff6[10] ="Off##";
+                                for(int i = 0 ; i < pointLightPositions.size();i++){
+                                    snprintf(buff, 10, "Light%d", i+1);
+                                    snprintf(buff2, 20,  "Light Position##%d", i+2);
+                                    snprintf(buff3, 25,  "Ambient Light##%d", i+2);
+                                    snprintf(buff3_1, 25,  "Diffuse Light##%d", i+2);
+                                    snprintf(buff3_2, 25,  "Specular Light##%d", i+2);
+                                    snprintf(buff4, 12,  "Delete##%d", i+2);
+                                    snprintf(buff5, 8,  "On##%d", i+2);
+                                    snprintf(buff6, 10,  "Off##%d", i+2);
+                                    if(ImGui::CollapsingHeader(buff, ImGuiTreeNodeFlags_DefaultOpen)){
+                                        if(lights[i+2] == true){
+                                            ImGui::DragFloat3(buff2, glm::value_ptr(pointLightPositions[i]), 0.05f);
+                                            ImGui::ColorEdit3(buff3, glm::value_ptr(pointLightAmbient[i+2]), 0.1f);
+                                            ImGui::ColorEdit3(buff3_1, glm::value_ptr(pointLightDiffuse[i+2]), 0.1f);
+                                            ImGui::ColorEdit3(buff3_2, glm::value_ptr(pointLightSpecular[i+2]), 0.1f);
+                                        }
+                                        if(ImGui::Button(buff5)){
+                                            lights[i+2] = true;
+                                        }
+                                        ImGui::SameLine();
+                                        if(ImGui::Button(buff6)){
+                                            lights[i+2] = false;
+                                        }
+                                        ImGui::SameLine();
+                                        if(ImGui::Button(buff4)){
+                                            pointLightPositions.erase(pointLightPositions.begin() + (i));
+                                            pointLightAmbient.erase(pointLightAmbient.begin() + (i+2));
+                                            pointLightDiffuse.erase(pointLightDiffuse.begin() + (i+2));
+                                            pointLightSpecular.erase(pointLightSpecular.begin() + (i+2));
+                                            lights.erase(lights.begin() +  (i+2));
+                                        }
+                                    } 
+                
+                                }
+                                if(ImGui::Button("ADD")){ 
+                                    if(pointLightPositions.size()==10){
+                                        return -1;
+                                    }
+                                    pointLightPositions.push_back(glm::vec3(0.0f, 0.0f, 0.0f));
+                                    pointLightAmbient.push_back(glm::vec3(0.5f, 0.5f, 0.5f));
+                                    pointLightDiffuse.push_back(glm::vec3(0.5f, 0.5f, 0.5f));
+                                    pointLightSpecular.push_back(glm::vec3(0.5f, 0.5f, 0.5f));
+                                    lights.push_back(true);
+                                }  
+                                ImGui::EndTabItem();
                         }
-                        pointLightPositions.push_back(glm::vec3(0.0f, 0.0f, 0.0f));
-                        pointLightColors.push_back(glm::vec3(0.5f, 0.5f, 0.5f));
-                        lights.push_back(true);
-                    }  
-
+                        if(ImGui::BeginTabItem("Directional Light")){
+                            if(ImGui::CollapsingHeader("Directional Light", ImGuiTreeNodeFlags_DefaultOpen)){
+                                if(lights[0] == true){
+                                    ImGui::DragFloat3("Direction", glm::value_ptr(direcLight), 0.05f);
+                                    ImGui::ColorEdit3("Ambient", glm::value_ptr(pointLightAmbient[0]), 0.1f);
+                                    ImGui::ColorEdit3("Diffuse", glm::value_ptr(pointLightDiffuse[0]), 0.1f);
+                                    ImGui::ColorEdit3("Specular", glm::value_ptr(pointLightSpecular[0]), 0.1f);
+                                }
+                                if(ImGui::Button("On##0")){
+                                    lights[0] = true;
+                                }
+                                ImGui::SameLine();
+                                if(ImGui::Button("Off##0")){
+                                    lights[0] = false;
+                                    direcLight = glm::vec3(0.0f,0.0f,0.0f);
+                                    pointLightAmbient[0] = glm::vec3(0.0f,0.0f,0.0f);
+                                    pointLightDiffuse[0] = glm::vec3(0.0f,0.0f,0.0f);
+                                    pointLightSpecular[0] = glm::vec3(0.0f,0.0f,0.0f);
+                                    reset = true;
+                                }
+                            }
+                                ImGui::EndTabItem();   
+                        }
+                        if(ImGui::BeginTabItem("Spot Light")){
+                                ImGui::EndTabItem();   
+                        }
+                        ImGui::EndTabBar();
+                    }
                     ImGui::EndTabItem();       
                 } 
-
                 ImGui::EndTabBar();
             }
 
@@ -318,70 +440,89 @@ int main()
        
         processInput(window);
 
+        glEnable(GL_DEPTH_TEST);
         glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+        glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT|GL_STENCIL_BUFFER_BIT);
 
+            lightShader.use();
+            lightShader.setVec3("viewPos", camera.Pos);
+            lightShader.setFloat("material.shininess", 32.0f);
+            lightShader.setInt("currentnumber", pointLightPositions.size());
 
+            if(lights[0] == true || reset == true){
+                lightShader.setVec3("dirLight.direction",direcLight);
+                lightShader.setVec3("dirLight.ambient", pointLightAmbient[0]);
+                lightShader.setVec3("dirLight.diffuse", pointLightDiffuse[0]);
+                lightShader.setVec3("dirLight.specular", pointLightSpecular[0]);
+                reset = false;
+            }
+        
+            for(int i = 0; i<pointLightPositions.size(); i++){
+                std::string target ="pointLights[" + std::to_string(i) + "].";
 
-        lightShader.use();
-        lightShader.setVec3("viewPos", camera.Pos);
-        lightShader.setFloat("material.shininess", 32.0f);
-        lightShader.setInt("currentnumber", pointLightPositions.size());
+                if(lights[i+2] == true){
+                    lightShader.setVec3(target + "position", pointLightPositions[i]);
+                    lightShader.setVec3(target + "ambient", pointLightAmbient[i+2]);
+                    lightShader.setVec3(target + "diffuse", pointLightDiffuse[i+2]);
+                    lightShader.setVec3(target + "specular", pointLightSpecular[i+2]);
+                    lightShader.setFloat(target + "constant", 1.0f);
+                    lightShader.setFloat(target + "linear", 0.09f);
+                    lightShader.setFloat(target + "quadratic", 0.032f);
+                }
+            }
+        
+            lightShader.setVec3("spotLight.position", camera.Pos);
+            lightShader.setVec3("spotLight.direction", camera.Front);
+            lightShader.setVec3("spotLight.ambient",  glm::vec3(0.0f, 0.0f, 0.0f));
+            lightShader.setVec3("spotLight.diffuse",  glm::vec3(1.0f, 1.0f, 1.0f));
+            lightShader.setVec3("spotLight.specular",  glm::vec3(1.0f, 1.0f, 1.0f));
+            lightShader.setFloat("spotLight.constant", 1.0f);
+            lightShader.setFloat("spotLight.linear", 0.09f);
+            lightShader.setFloat("spotLight.quadratic", 0.032f);
+            lightShader.setFloat("spotLight.cutOff", glm::cos(glm::radians(12.5f)));
+            lightShader.setFloat("spotLight.outerCutOff", glm::cos(glm::radians(15.0f)));     
 
-        lightShader.setVec3("dirLight.direction", glm::vec3(-0.2f, -1.0f, -0.3f));
-        lightShader.setVec3("dirLight.ambient", glm::vec3(0.05f, 0.05f, 0.05f));
-        lightShader.setVec3("dirLight.diffuse", glm::vec3(0.4f, 0.4f, 0.4f));
-        lightShader.setVec3("dirLight.specular", glm::vec3(0.5f, 0.5f, 0.5f));
+            glm::mat4 projection = glm::perspective(glm::radians(45.0f), 800.0f/600.0f, 0.1f, 1000.0f);
+            lightShader.setMat4("projection", projection);
 
+            glm::mat4 view = camera.GetViewMatrix();
+            lightShader.setMat4("view", view);
     
-        for(int i = 0; i<pointLightPositions.size(); i++){
-            std::string target ="pointLights[" + std::to_string(i) + "].";
+            // simpleShader.use();
+            // simpleShader.setMat4("view", view);
+            // simpleShader.setMat4("projection", projection);
 
-             if(lights[i] == true){
-                lightShader.setVec3(target + "position", pointLightPositions[i]);
-                lightShader.setVec3(target + "ambient", pointLightColors[i]);
-                lightShader.setVec3(target + "diffuse", pointLightColors[i]);
-                lightShader.setVec3(target + "specular", pointLightColors[i]);
-                lightShader.setFloat(target + "constant", 1.0f);
-                lightShader.setFloat(target + "linear", 0.09f);
-                lightShader.setFloat(target + "quadratic", 0.032f);
-             }
-        }
+           // glm::mat4 model = glm::mat4(1.0f);
+            //lightShader.setMat4("model", model);
+            // glEnable(GL_STENCIL_TEST);
+            // glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
+            // glStencilFunc(GL_ALWAYS, 1, 0xFF);
+            // glStencilMask(0xFF);
+            for(int i = 0 ; i < objectPositions.size();i++){
+                glm::mat4 model = glm::mat4(1.0f);
+                model = glm::translate(model, objectPositions[i]);
+                model = glm::scale(model, sizes[i]);
+                lightShader.setMat4("model", model);
+                models[i].Draw(lightShader);
+            }
+
+            // glStencilFunc(GL_NOTEQUAL, 1, 0xFF);
+            // glStencilMask(0x00);
+            // glDisable(GL_DEPTH_TEST);
+            // simpleShader.use();
+            // for(int i = 0 ; i < objectPositions.size();i++){
+            //     glm::mat4 model = glm::mat4(1.0f);
+            //     model = glm::translate(model, glm::vec3(objectPositions[i].x,objectPositions[i].y,objectPositions[i].z));
+            //     //model = glm::scale(model, glm::vec3(1.1f,1.1f,1.1f));
+            //     lightShader.setMat4("model", model);
+            //     models[i].Draw(lightShader);
+            // }
+     
+            // glEnable(GL_DEPTH_TEST);
+            // glDisable(GL_STENCIL_TEST);
+            // glStencilFunc(GL_ALWAYS, 1, 0xFF);
+            // glStencilMask(0xFF);
        
-        lightShader.setVec3("spotLight.position", camera.Pos);
-        lightShader.setVec3("spotLight.direction", camera.Front);
-        lightShader.setVec3("spotLight.ambient",  glm::vec3(0.0f, 0.0f, 0.0f));
-        lightShader.setVec3("spotLight.diffuse",  glm::vec3(1.0f, 1.0f, 1.0f));
-        lightShader.setVec3("spotLight.specular",  glm::vec3(1.0f, 1.0f, 1.0f));
-        lightShader.setFloat("spotLight.constant", 1.0f);
-        lightShader.setFloat("spotLight.linear", 0.09f);
-        lightShader.setFloat("spotLight.quadratic", 0.032f);
-        lightShader.setFloat("spotLight.cutOff", glm::cos(glm::radians(12.5f)));
-        lightShader.setFloat("spotLight.outerCutOff", glm::cos(glm::radians(15.0f)));     
-
-
-        glm::mat4 projection = glm::perspective(glm::radians(45.0f), 800.0f/600.0f, 0.1f, 100.0f);
-        lightShader.setMat4("projection", projection);
-
-       
-        glm::mat4 view = camera.GetViewMatrix();
-        lightShader.setMat4("view", view);
-
-        glm::mat4 model = glm::mat4(1.0f);
-        for(int i = 0 ; i < objectPositions.size();i++){
-            model = glm::translate(model, objectPositions[i]);
-            lightShader.setMat4("model", model);
-        }
-
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, t1->get());
-
-        glActiveTexture(GL_TEXTURE1);
-        glBindTexture(GL_TEXTURE_2D, t2->get());
-
-
-        if(numofobj >= 0)
-            models[0].Draw(lightShader);
 
         lightcubeShader.use();
         lightcubeShader.setMat4("projection", projection);
@@ -390,17 +531,30 @@ int main()
         glBindVertexArray(lightVAO);
         for (unsigned int i = 0; i < pointLightPositions.size(); i++)
         {
-            if(lights[i] == true){
-                model = glm::mat4(1.0f);
+            if(lights[i+2] == true){
+                glm::mat4 model = glm::mat4(1.0f);
                 model = glm::translate(model, pointLightPositions[i]);
                 model = glm::scale(model, glm::vec3(0.2f)); // Make it a smaller cube
                 lightcubeShader.setMat4("model", model);
-                lightcubeShader.setVec3("lightColor", pointLightColors[i]);
+                lightcubeShader.setVec3("lightColor", pointLightDiffuse[i+2]);
                 glDrawArrays(GL_TRIANGLES, 0, 36);
             }
         }
-        
 
+        glDepthFunc(GL_LEQUAL);  // change depth function so depth test passes when values are equal to depth buffer's content
+        skyboxShader.use();
+        view = glm::mat4(glm::mat3(camera.GetViewMatrix())); // remove translation from the view matrix
+        skyboxShader.setMat4("view", view);
+        skyboxShader.setMat4("projection", projection);
+        // skybox cube
+        glBindVertexArray(skyboxVAO);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, cubemapTexture);
+        glDrawArrays(GL_TRIANGLES, 0, 36);
+        glBindVertexArray(0);
+        glDepthFunc(GL_LESS); // set depth function back to default
+        
+        
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         glfwSwapBuffers(window);
@@ -484,4 +638,34 @@ void OnMouseButton(GLFWwindow* window, int button, int action, int modifier) {
     camera.MouseButton(button, action, x, y);
     
 }
+
+unsigned int loadCubemap(vector<std::string> faces)
+{
+    unsigned int textureID;
+    glGenTextures(1, &textureID);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, textureID);
+
+    int width, height, nrChannels;
+    for (unsigned int i = 0; i < faces.size(); i++)
+    {
+        unsigned char *data = stbi_load(faces[i].c_str(), &width, &height, &nrChannels, 0);
+        if (data)
+        {
+            glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+            stbi_image_free(data);
+        }
+        else
+        {
+            std::cout << "Cubemap failed to load at path: " << faces[i] << std::endl;
+            stbi_image_free(data);
+        }
+    }
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S,GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R,GL_CLAMP_TO_EDGE);
+    return textureID;
+}
+
 
