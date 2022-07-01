@@ -11,11 +11,15 @@ project(${PROJECT_NAME})
 add_executable(${PROJECT_NAME} 
     src/main.cpp
     src/shader.h
+    src/shader.cpp
     src/texture.h
+    src/texture.cpp
     src/camera.h
     src/camera.cpp
     src/model.h
+    src/model.cpp
     src/mesh.h
+    src/mesh.cpp
     src/ImGuiFileBrowser.h
     src/ImGuiFileBrowser.cpp
     )
